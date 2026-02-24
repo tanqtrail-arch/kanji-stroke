@@ -91,8 +91,8 @@
       gradeSelect: '学年をえらぶ',
       kanjiList: `小${state.selectedGrade}の漢字`,
       kanjiDetail: '',
-      quizMenu: 'クイズ',
-      quizGrade: '学年をえらぶ',
+      quizGrade: 'クイズ',
+      quizMenu: 'クイズのしゅるい',
       quizPlay: 'クイズ',
       quizResult: 'リザルト',
       puzzleMenu: '部首パズル',
@@ -118,8 +118,8 @@
       gradeSelect: 'home',
       kanjiList: 'gradeSelect',
       kanjiDetail: 'kanjiList',
-      quizMenu: 'home',
-      quizGrade: 'quizMenu',
+      quizGrade: 'home',
+      quizMenu: 'quizGrade',
       quizPlay: 'quizMenu',
       quizResult: 'quizMenu',
       puzzleMenu: 'home',
@@ -412,7 +412,7 @@
       btn.addEventListener('click', () => {
         const action = btn.dataset.action;
         if (action === 'grade-select') navigateTo('gradeSelect');
-        if (action === 'quiz') navigateTo('quizMenu');
+        if (action === 'quiz') navigateTo('quizGrade');
         if (action === 'puzzle') navigateTo('puzzleMenu');
         if (action === 'mypage') { renderMypage(); navigateTo('mypage'); }
       });
@@ -463,7 +463,7 @@
     $$('.quiz-type-card[data-quiz-type]').forEach(card => {
       card.addEventListener('click', () => {
         quizSelectedType = card.dataset.quizType;
-        navigateTo('quizGrade');
+        startQuiz();
       });
     });
 
@@ -471,7 +471,7 @@
     $$('[data-quiz-grade]').forEach(card => {
       card.addEventListener('click', () => {
         quizSelectedGrade = parseInt(card.dataset.quizGrade, 10);
-        startQuiz();
+        navigateTo('quizMenu');
       });
     });
 
@@ -919,13 +919,22 @@
     $('#result-alt').textContent = `+${r.earnedAlt}`;
 
     // 統計記録
-    ScoreManager.recordQuiz(r.correctCount, r.total, r.maxCombo);
+    ScoreManager.recordQuiz(r.correctCount, r.total, r.maxCombo, quizSelectedGrade);
+
+    // にがてな漢字を記録
+    if (r.mistakes && r.mistakes.length > 0) {
+      r.mistakes.forEach(m => {
+        if (m.kanji) {
+          ScoreManager.recordMistake(m.kanji, quizSelectedGrade, quizSelectedType);
+        }
+      });
+    }
 
     // ALT加算
     if (r.earnedAlt > 0) {
       addAlt(r.earnedAlt, `クイズ完了 +${r.earnedAlt} ALT`);
-      saveProgress();
     }
+    saveProgress();
 
     // まちがえた問題
     const mistakesDiv = $('#result-mistakes');
@@ -1175,6 +1184,18 @@
   // ============================================================
   // マイページ
   // ============================================================
+  const QUIZ_TYPE_LABELS = {
+    reading: '読み',
+    strokeCount: '画数',
+    strokeOrder: '書き順',
+    meaning: '意味',
+  };
+
+  const GRADE_COLORS = {
+    1: '#FF6B6B', 2: '#FF9F43', 3: '#FECA57',
+    4: '#48DBFB', 5: '#0ABDE3', 6: '#8E44AD',
+  };
+
   function renderMypage() {
     const studiedCount = Object.keys(state.studiedKanji).length;
     ScoreManager.updateStudied(studiedCount);
@@ -1193,6 +1214,70 @@
     $('#mypage-puzzle-correct').textContent = stats.puzzleCorrect;
     $('#mypage-max-combo').textContent = stats.maxCombo;
 
+    // 学年べつ進捗グリッド
+    const gradeGrid = $('#mypage-grade-grid');
+    gradeGrid.innerHTML = '';
+    const perGrade = ScoreManager.getPerGradeStats();
+
+    for (let g = 1; g <= 6; g++) {
+      const studied = countStudiedForGrade(g);
+      const total = GRADE_COUNTS[g];
+      const studiedPct = total > 0 ? Math.round((studied / total) * 100) : 0;
+
+      const pg = perGrade[g];
+      let accuracyText = '---';
+      if (pg && pg.quizTotal > 0) {
+        const acc = Math.round((pg.quizCorrect / pg.quizTotal) * 100);
+        accuracyText = `正答率 ${acc}%`;
+      }
+
+      const card = document.createElement('button');
+      card.className = 'mypage-grade-card';
+      card.style.setProperty('--grade-color', GRADE_COLORS[g]);
+      card.innerHTML = `
+        <span class="grade-num">小${g}</span>
+        <span class="grade-studied">${studied} / ${total} (${studiedPct}%)</span>
+        <span class="grade-accuracy">${accuracyText}</span>
+      `;
+      card.addEventListener('click', () => selectGrade(g));
+      gradeGrid.appendChild(card);
+    }
+
+    // にがてな漢字セクション
+    const wk = ScoreManager.getWeakKanji();
+    const weakEntries = Object.entries(wk);
+    const weakSection = $('#mypage-weak-section');
+    const weakList = $('#mypage-weak-list');
+
+    if (weakEntries.length === 0) {
+      weakSection.style.display = 'none';
+    } else {
+      weakSection.style.display = '';
+      $('#mypage-weak-count').textContent = weakEntries.length;
+      weakList.innerHTML = '';
+
+      // 最新の間違い順にソート
+      weakEntries.sort((a, b) => (b[1].lastMistake || 0) - (a[1].lastMistake || 0));
+
+      weakEntries.forEach(([char, info]) => {
+        const typeLabels = info.types.map(t => QUIZ_TYPE_LABELS[t] || t).join('・');
+        const item = document.createElement('div');
+        item.className = 'weak-kanji-item';
+        item.innerHTML = `
+          <span class="weak-kanji-char">${char}</span>
+          <div class="weak-kanji-info">
+            <span class="weak-kanji-grade">小${info.grade}</span>
+            <span class="weak-kanji-types">${typeLabels}をまちがえた</span>
+          </div>
+        `;
+        weakList.appendChild(item);
+      });
+
+      // 復習クイズボタンのイベント
+      const reviewBtn = $('#mypage-review-btn');
+      reviewBtn.onclick = () => startReviewQuiz();
+    }
+
     // バッジグリッド
     const badges = BadgeManager.getAllBadges();
     const badgeGrid = $('#badge-grid');
@@ -1209,6 +1294,75 @@
       div.title = b.unlocked ? b.desc : '';
       badgeGrid.appendChild(div);
     });
+  }
+
+  // ============================================================
+  // 復習クイズ
+  // ============================================================
+  async function startReviewQuiz() {
+    const wk = ScoreManager.getWeakKanji();
+    const entries = Object.entries(wk);
+
+    if (entries.length < 4) {
+      showToast('にがてな漢字が4つ以上たまったら復習できます', '');
+      return;
+    }
+
+    // 最頻出タイプを特定
+    const typeCounts = {};
+    entries.forEach(([, info]) => {
+      info.types.forEach(t => {
+        typeCounts[t] = (typeCounts[t] || 0) + 1;
+      });
+    });
+    let bestType = 'reading';
+    let bestCount = 0;
+    for (const [t, c] of Object.entries(typeCounts)) {
+      if (c > bestCount) {
+        bestCount = c;
+        bestType = t;
+      }
+    }
+
+    // 出題プールを構築: 必要な学年データを読み込み
+    const neededGrades = new Set(entries.map(([, info]) => info.grade));
+    for (const g of neededGrades) {
+      if (!gradeCache[g]) {
+        try {
+          const resp = await fetch(`data/kanji-grade${g}.json`);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          gradeCache[g] = await resp.json();
+        } catch (err) {
+          console.error('データ読み込みエラー:', err);
+        }
+      }
+    }
+
+    // weakKanjiの漢字をプールに集める
+    const pool = [];
+    entries.forEach(([char, info]) => {
+      const gd = gradeCache[info.grade];
+      if (!gd) return;
+      const found = gd.find(k => k.char === char);
+      if (found) pool.push(found);
+    });
+
+    if (pool.length < 4) {
+      showToast('復習データが足りません', '');
+      return;
+    }
+
+    quizSelectedType = bestType;
+    quizSelectedGrade = null; // 復習モードでは学年混合
+
+    const firstQ = QuizEngine.start(bestType, pool);
+    if (!firstQ) {
+      showToast('復習クイズを開始できません', '');
+      return;
+    }
+
+    navigateTo('quizPlay');
+    renderQuestion(firstQ);
   }
 
   // ============================================================

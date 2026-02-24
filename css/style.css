@@ -1198,6 +1198,91 @@ a {
   font-weight: 700;
 }
 
+/* 学年べつ進捗グリッド */
+.mypage-grade-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.mypage-grade-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  background: #fff;
+  border-radius: 12px;
+  border: 2px solid var(--grade-color, #E8E4DF);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+  text-align: center;
+}
+
+.mypage-grade-card:active {
+  transform: scale(0.95);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.mypage-grade-card .grade-num {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--grade-color);
+}
+
+.mypage-grade-card .grade-studied {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.mypage-grade-card .grade-accuracy {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--grade-color);
+}
+
+/* にがてな漢字リスト */
+.weak-kanji-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.weak-kanji-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #fff;
+  border-radius: 10px;
+  border-left: 4px solid #E74C3C;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.weak-kanji-char {
+  font-size: 1.5rem;
+  font-weight: 900;
+  min-width: 36px;
+  text-align: center;
+}
+
+.weak-kanji-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.weak-kanji-grade {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.weak-kanji-types {
+  font-size: 0.78rem;
+  color: #E74C3C;
+  font-weight: 500;
+}
+
 /* 統計カード */
 .stats-grid {
   display: grid;

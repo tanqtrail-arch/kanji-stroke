@@ -20,6 +20,8 @@
     studiedKanji: {},  // { "日": true, "月": true, ... }
   };
 
+  let altEarned = 0; // 🆕 TrailNav ALT獲得トラッカー
+
   // 学年データキャッシュ
   const gradeCache = {};
 
@@ -81,6 +83,15 @@
 
     state.currentScreen = screenName;
 
+    // 🆕 TrailNav: ゲームプレイ画面ではナビ非表示
+    if (typeof TrailNav !== 'undefined') {
+      if (['quizPlay', 'puzzlePlay'].includes(screenName)) {
+        TrailNav.hideNav();
+      } else {
+        TrailNav.showNav();
+      }
+    }
+
     // 戻るボタン制御
     const showBack = screenName !== 'home';
     els.btnBack.style.display = showBack ? 'flex' : 'none';
@@ -129,6 +140,16 @@
     };
     navigateTo(backMap[state.currentScreen] || 'home');
   }
+
+  // 🆕 TrailNav: ゲームホームに戻る関数
+  window.showGameHome = function() {
+    StrokeAnimator.stop();
+    if (typeof BushuPuzzle !== 'undefined') BushuPuzzle.stopTimer();
+    if (reviewActive) { StrokeReviewer.destroy(); reviewActive = false; }
+    altEarned = 0;
+    navigateTo('home');
+    if (typeof TrailNav !== 'undefined') TrailNav.showNav();
+  };
 
   // ============================================================
   // 学年選択
@@ -327,6 +348,9 @@
     if (message) showToast(message, 'alt');
     ScoreManager.checkLevelUp(prevAlt, state.totalAlt);
     triggerBadgeCheck();
+    // 🆕 TrailNav: サーバーALT連携
+    altEarned += amount;
+    if (typeof TrailNav !== 'undefined') TrailNav.earnAlt(amount, message || '');
   }
 
   // ============================================================
@@ -492,6 +516,7 @@
   }
 
   async function startQuiz() {
+    altEarned = 0; // 🆕 ALTリセット
     // データ読み込み
     if (!gradeCache[quizSelectedGrade]) {
       try {
@@ -907,7 +932,9 @@
     feedback.style.display = 'block';
   }
 
-  function showQuizResult() {
+  async function showQuizResult() { // 🆕 async化
+    // 🆕 ALTをサーバーに送信
+    if (typeof TrailNav !== 'undefined') await TrailNav.flushAltWithRetry();
     navigateTo('quizResult');
     const r = QuizEngine.getResult();
 
@@ -935,6 +962,11 @@
       addAlt(r.earnedAlt, `クイズ完了 +${r.earnedAlt} ALT`);
     }
     saveProgress();
+
+    // 🆕 ALT獲得表示
+    const altDisplay = document.getElementById('altEarnedDisplay');
+    if (altDisplay) { altDisplay.style.display = altEarned > 0 ? 'block' : 'none'; if (altEarned > 0) document.getElementById('altEarnedVal').textContent = altEarned; }
+    altEarned = 0; // 🆕 リセット
 
     // まちがえた問題
     const mistakesDiv = $('#result-mistakes');
@@ -1150,7 +1182,9 @@
     }
   }
 
-  function showPuzzleResult() {
+  async function showPuzzleResult() { // 🆕 async化
+    // 🆕 ALTをサーバーに送信
+    if (typeof TrailNav !== 'undefined') await TrailNav.flushAltWithRetry();
     navigateTo('puzzleResult');
     const r = BushuPuzzle.getResult();
 
@@ -1168,6 +1202,11 @@
       addAlt(r.earnedAlt, `パズル完了 +${r.earnedAlt} ALT`);
       saveProgress();
     }
+
+    // 🆕 ALT獲得表示（パズル）
+    const puzzleAltDisplay = document.getElementById('puzzleAltEarnedDisplay');
+    if (puzzleAltDisplay) { puzzleAltDisplay.style.display = altEarned > 0 ? 'block' : 'none'; if (altEarned > 0) document.getElementById('puzzleAltEarnedVal').textContent = altEarned; }
+    altEarned = 0; // 🆕 リセット
 
     const mistakesDiv = $('#puzzle-result-mistakes');
     const mistakesList = $('#puzzle-result-mistakes-list');

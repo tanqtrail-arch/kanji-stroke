@@ -348,9 +348,7 @@
     if (message) showToast(message, 'alt');
     ScoreManager.checkLevelUp(prevAlt, state.totalAlt);
     triggerBadgeCheck();
-    // 🆕 TrailNav: サーバーALT連携
     altEarned += amount;
-    if (typeof TrailNav !== 'undefined') TrailNav.earnAlt(amount, message || '');
   }
 
   // ============================================================
@@ -933,10 +931,18 @@
   }
 
   async function showQuizResult() { // 🆕 async化
-    // 🆕 ALTをサーバーに送信
-    if (typeof TrailNav !== 'undefined') await TrailNav.flushAltWithRetry();
     navigateTo('quizResult');
     const r = QuizEngine.getResult();
+
+    // 🆕 TrailNav v2: スコア送信
+    if (typeof TrailNav !== 'undefined') {
+      await TrailNav.reportGameResult({
+        score: r.score,
+        correctCount: r.correctCount,
+        totalCount: r.total,
+        maxStreak: r.maxCombo,
+      });
+    }
 
     $('#result-icon').textContent = r.isPerfect ? '🏆' : (r.accuracy >= 0.7 ? '🎉' : '📖');
     $('#result-title').textContent = r.isPerfect ? 'パーフェクト！' : (r.accuracy >= 0.7 ? 'よくできました！' : 'もうちょっと！');
@@ -1183,10 +1189,18 @@
   }
 
   async function showPuzzleResult() { // 🆕 async化
-    // 🆕 ALTをサーバーに送信
-    if (typeof TrailNav !== 'undefined') await TrailNav.flushAltWithRetry();
     navigateTo('puzzleResult');
     const r = BushuPuzzle.getResult();
+
+    // 🆕 TrailNav v2: スコア送信
+    if (typeof TrailNav !== 'undefined') {
+      await TrailNav.reportGameResult({
+        score: r.score,
+        correctCount: r.correctCount,
+        totalCount: r.total,
+        maxStreak: r.maxCombo,
+      });
+    }
 
     $('#puzzle-result-icon').textContent = r.isPerfect ? '🏆' : (r.accuracy >= 0.7 ? '🧩' : '📖');
     $('#puzzle-result-title').textContent = r.isPerfect ? 'パーフェクト！' : (r.accuracy >= 0.7 ? 'よくできました！' : 'もうちょっと！');
